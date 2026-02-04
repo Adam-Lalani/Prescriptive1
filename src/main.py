@@ -3,7 +3,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from dimacs_parser import DimacsParser
 from model_timer import Timer
-from dpll import DPLL
+from dpll import DPLL, DPLL2
 
 def main(args):
     input_file = args.input_file
@@ -27,15 +27,18 @@ def main(args):
     
     dpll = DPLL(instance)
     dpll.run_dpll(dpll.root)
+    solution = dpll.solution
+    # dpll = DPLL2()
+    # solution = dpll.run_dpll(instance)
     
     timer.stop()
 
     result = "--"
-    if dpll.solution is not None:
+    if solution is not None:
         result = ""
-        for var, val in dpll.solution.items():
-            result += var + " "
-            result += "true " if val else "false "
+        for var in instance.vars:
+            result += str(var) + " "
+            result += "true " if solution[var] else "false "
         
     printSol = {
         "Instance": filename,
