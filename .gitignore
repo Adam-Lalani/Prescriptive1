@@ -4,3 +4,4 @@
 !src/**
 !.gitignore
 !julia_adam/
+!julia_adam/**
