@@ -3,6 +3,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from dimacs_parser import DimacsParser
 from model_timer import Timer
+from dpll import DPLL
 
 def main(args):
     input_file = args.input_file
@@ -24,12 +25,22 @@ def main(args):
     except Exception as e:
         print(f"Error: {e}")
     
-    timer.stop()
+    dpll = DPLL(instance)
+    dpll.run_dpll(dpll.root)
     
+    timer.stop()
+
+    result = "--"
+    if dpll.solution is not None:
+        result = ""
+        for var, val in dpll.solution.items():
+            result += var + " "
+            result += "true " if val else "false "
+        
     printSol = {
         "Instance": filename,
         "Time": f"{timer.getTime():.2f}",
-        "Result": "--"
+        "Result": result
     }
     
     print(json.dumps(printSol))
