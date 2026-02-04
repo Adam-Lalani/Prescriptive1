@@ -25,11 +25,11 @@ def main(args):
     except Exception as e:
         print(f"Error: {e}")
     
-    dpll = DPLL(instance)
-    dpll.run_dpll(dpll.root)
-    solution = dpll.solution
-    # dpll = DPLL2()
-    # solution = dpll.run_dpll(instance)
+    # dpll = DPLL(instance)
+    # dpll.run_dpll(dpll.root)
+    # solution = dpll.solution
+    dpll = DPLL2()
+    solution = dpll.run_dpll(instance)
     
     timer.stop()
 
