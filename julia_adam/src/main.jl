@@ -5,6 +5,7 @@ include("sat_instance.jl")
 include("model_timer.jl")
 include("dimacs_parser.jl")
 include("dpll_solver.jl")
+include("cdcl_vsids_solver.jl")
 
 using .DimacsParser
 
@@ -29,10 +30,10 @@ function main(input_file::String)
         println("Error: $e")
     end
     
-    # Solve using 2-watched literals DPLL solver
+    # Solve using CDCL solver with 2-watched literals and VSIDS
     solution = nothing
     if instance !== nothing
-        solution = solve(instance)
+        solution = cdcl_solve(instance)
     end
     
     stop(timer)
