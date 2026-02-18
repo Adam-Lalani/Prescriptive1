@@ -3,6 +3,10 @@ include("dimacs_parser.jl")
 include("model_timer.jl")
 include("dpll.jl")
 
+using Pkg
+Pkg.activate(joinpath(@__DIR__, ".."))
+Pkg.instantiate()
+
 using JSON
 using .DimacsParser
 
