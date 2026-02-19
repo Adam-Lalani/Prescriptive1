@@ -4,14 +4,12 @@
 ############# CSCI 2951-O ##############
 ########################################
 E_BADARGS=65
-if [ $# -ne 1 ]
+if [ $# -lt 1 ]
 then
-	echo "Usage: `basename $0` <input>"
+	echo "Usage: `basename $0` [--solver <name>] <input>"
 	exit $E_BADARGS
 fi
 
-input=$1
-
-# run the solver
+# run the solver — forward all arguments to main.jl
 set -e
-julia --project=. src/main.jl "$input"
+julia --project=. src/main.jl "$@"

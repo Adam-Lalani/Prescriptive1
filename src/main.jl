@@ -1,7 +1,12 @@
 include("sat_instance.jl")
 include("dimacs_parser.jl")
 include("model_timer.jl")
-include("dpll.jl")
+
+include("solvers/dpll.jl")
+include("solvers/dpll_bad.jl")
+include("solvers/cdcl_basic_solver.jl")
+include("solvers/cdcl_vsids_solver.jl")
+include("solvers/cdcl_vsids_luby_solver.jl")
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
@@ -10,13 +15,53 @@ Pkg.instantiate()
 using JSON
 using .DimacsParser
 
+const SOLVERS = Dict(
+    "dpll"            => inst -> DPLLSolver.run_dpll(inst),
+    "dpll_bad"        => inst -> DPLLBad.run_dpll(inst),
+    "cdcl_basic"      => inst -> CDCLBasic.cdcl_solve(inst),
+    "cdcl_vsids"      => inst -> CDCLVSIDS.cdcl_solve(inst),
+    "cdcl_vsids_luby" => inst -> CDCLVSIDSLuby.cdcl_solve(inst),
+)
+
+const DEFAULT_SOLVER = "dpll"
+
+function parse_args(args::Vector{String})
+    solver_name = DEFAULT_SOLVER
+    input_file = nothing
+
+    i = 1
+    while i <= length(args)
+        if args[i] == "--solver"
+            if i + 1 > length(args)
+                error("--solver requires a value. Available: $(join(sort(collect(keys(SOLVERS))), ", "))")
+            end
+            solver_name = args[i + 1]
+            i += 2
+        else
+            input_file = args[i]
+            i += 1
+        end
+    end
+
+    return solver_name, input_file
+end
+
 function main(args::Vector{String})
-    if isempty(args)
-        println("Usage: julia main.jl <cnf file>")
+    solver_name, input_file = parse_args(args)
+
+    if isnothing(input_file)
+        println("Usage: julia main.jl [--solver <name>] <cnf file>")
+        println("Available solvers: $(join(sort(collect(keys(SOLVERS))), ", "))")
         return
     end
-    
-    input_file = args[1]
+
+    if !haskey(SOLVERS, solver_name)
+        println("Unknown solver: $solver_name")
+        println("Available solvers: $(join(sort(collect(keys(SOLVERS))), ", "))")
+        return
+    end
+
+    solve_fn = SOLVERS[solver_name]
     filename = basename(input_file)
     
     timer = Timer()
@@ -28,8 +73,7 @@ function main(args::Vector{String})
             print(instance)
         end
         
-        # Use optimized 2-watched literal DPLL solver
-        sol = run_dpll(instance)
+        sol = solve_fn(instance)
         
         stop!(timer)
         

@@ -1,6 +1,6 @@
-include("sat_instance.jl")
+module DPLLBad
 
-using .Main: SATInstance
+import ..SATInstance
 
 # Highly optimized DPLL with multiple speed improvements
 mutable struct WatchedClauseOptimized
@@ -46,8 +46,6 @@ mutable struct DPLL
         num_vars = Int32(instance.numVars)
         clauses = WatchedClauseOptimized[]
         
-        # Pre-allocate watch list: use encoding where lit = var*2 + (sign?0:1)
-        # This avoids negative indexing and Dict overhead
         watch_list = [Int32[] for _ in 1:(2*num_vars + 2)]
         
         for clause_set in instance.clauses
@@ -80,7 +78,7 @@ mutable struct DPLL
         activity = zeros(Float32, num_vars + 1)
         heap = collect(Int32(1):num_vars)
         heap_pos = collect(Int32(1):num_vars)
-        heap_pos[1] = Int32(0)  # 0 means not in heap
+        heap_pos[1] = Int32(0)
         
         new(clauses, watch_list, assignment, assignment_stack, decision_level,
             num_vars, Int32(0), activity, Float32(1.0), Float32(0.95),
@@ -88,7 +86,6 @@ mutable struct DPLL
     end
 end
 
-# Encode literal to array index: positive lit = var*2, negative = var*2+1
 @inline function encode_literal(lit::Int32, num_vars::Int32)::Int32
     var = abs(lit)
     return lit > 0 ? Int32(var * 2) : Int32(var * 2 + 1)
@@ -98,24 +95,21 @@ end
     return encode_literal(Int32(lit), num_vars)
 end
 
-# Fast literal evaluation
 @inline function lit_value(solver::DPLL, lit::Int32)::Int8
     var = abs(lit)
     val = solver.assignment[var]
     if val == 0
-        return Int8(0)  # unassigned
+        return Int8(0)
     end
     return (lit > 0) == (val == 1) ? Int8(1) : Int8(-1)
 end
 
-# Assign variable at current decision level
 @inline function assign!(solver::DPLL, var::Int32, value::Bool)
     solver.assignment[var] = value ? Int8(1) : Int8(-1)
     solver.decision_level[var] = solver.current_level
     push!(solver.assignment_stack, var)
 end
 
-# Backtrack to a specific decision level
 function backtrack!(solver::DPLL, level::Int32)
     while !isempty(solver.assignment_stack)
         var = solver.assignment_stack[end]
@@ -129,17 +123,16 @@ function backtrack!(solver::DPLL, level::Int32)
     solver.current_level = level
 end
 
-# VSIDS heap operations
 @inline function heap_parent(i::Int32)::Int32
-    return i >> 1  # i ÷ 2
+    return i >> 1
 end
 
 @inline function heap_left(i::Int32)::Int32
-    return i << 1  # i * 2
+    return i << 1
 end
 
 @inline function heap_right(i::Int32)::Int32
-    return (i << 1) | Int32(1)  # i * 2 + 1
+    return (i << 1) | Int32(1)
 end
 
 function heap_swap!(solver::DPLL, i::Int32, j::Int32)
@@ -226,7 +219,6 @@ end
 function bump_activity!(solver::DPLL, var::Int32)
     solver.activity[var] += solver.activity_inc
     
-    # Rescale if necessary to prevent overflow
     if solver.activity[var] > Float32(1e20)
         for v in 1:solver.num_vars
             solver.activity[v] *= Float32(1e-20)
@@ -234,7 +226,6 @@ function bump_activity!(solver::DPLL, var::Int32)
         solver.activity_inc *= Float32(1e-20)
     end
     
-    # Update heap position
     pos = solver.heap_pos[var]
     if pos > 0
         heap_up!(solver, pos)
@@ -245,9 +236,7 @@ function decay_activity!(solver::DPLL)
     solver.activity_inc /= solver.activity_decay
 end
 
-# Optimized propagation with conflict analysis
 function propagate!(solver::DPLL, lit::Int32)::Int32
-    # Returns 0 if no conflict, otherwise returns conflicting clause index
     queue = Int32[lit]
     queue_head = 1
     
@@ -263,24 +252,20 @@ function propagate!(solver::DPLL, lit::Int32)::Int32
             clause_idx = watching_clauses[i]
             clause = solver.clauses[clause_idx]
             
-            # Find which watch is falsified
             lit1 = clause.literals[clause.watch1]
             lit2 = clause.literals[clause.watch2]
             
-            # Ensure lit1 is the falsified one
             if lit1 != -curr_lit
                 lit1, lit2 = lit2, lit1
                 clause.watch1, clause.watch2 = clause.watch2, clause.watch1
             end
             
-            # Check if other watch satisfies clause
             val2 = lit_value(solver, lit2)
             if val2 == 1
                 i += 1
                 continue
             end
             
-            # Try to find new watch
             found_new = false
             for j in Int32(1):Int32(length(clause.literals))
                 if j == clause.watch1 || j == clause.watch2
@@ -290,7 +275,7 @@ function propagate!(solver::DPLL, lit::Int32)::Int32
                 lit_j = clause.literals[j]
                 val_j = lit_value(solver, lit_j)
                 
-                if val_j != -1  # Not falsified
+                if val_j != -1
                     clause.watch1 = j
                     deleteat!(watching_clauses, i)
                     
@@ -306,13 +291,10 @@ function propagate!(solver::DPLL, lit::Int32)::Int32
                 continue
             end
             
-            # No new watch found
             if val2 == -1
-                # Conflict!
                 return clause_idx
             end
             
-            # Unit propagation
             if val2 == 0
                 var2 = abs(lit2)
                 value2 = lit2 > 0
@@ -324,10 +306,9 @@ function propagate!(solver::DPLL, lit::Int32)::Int32
         end
     end
     
-    return Int32(0)  # No conflict
+    return Int32(0)
 end
 
-# Pick branching variable using VSIDS
 function pick_branching_variable(solver::DPLL)::Int32
     while solver.heap_size > 0
         var = heap_remove_max!(solver)
@@ -338,14 +319,9 @@ function pick_branching_variable(solver::DPLL)::Int32
     return Int32(0)
 end
 
-# Analyze conflict and learn clause (simplified non-chronological backtracking)
 function analyze_conflict!(solver::DPLL, conflict_clause_idx::Int32)::Int32
-    # For simplicity, just backtrack one level
-    # Full implementation would do clause learning and compute backtrack level
-    
     clause = solver.clauses[conflict_clause_idx]
     
-    # Bump activity of variables in conflict
     for lit in clause.literals
         var = abs(lit)
         bump_activity!(solver, var)
@@ -354,16 +330,13 @@ function analyze_conflict!(solver::DPLL, conflict_clause_idx::Int32)::Int32
     decay_activity!(solver)
     solver.conflicts += Int32(1)
     
-    # Simple backtracking: go back one decision level
     if solver.current_level > 0
         return solver.current_level - Int32(1)
     end
-    return Int32(-1)  # UNSAT at level 0
+    return Int32(-1)
 end
 
-# Main search with optimizations
 function solve!(solver::DPLL)::Bool
-    # Initial unit propagation
     for clause in solver.clauses
         if length(clause.literals) == 1
             lit = clause.literals[1]
@@ -384,7 +357,6 @@ function solve!(solver::DPLL)::Bool
     end
     
     while true
-        # Check if all variables assigned
         all_assigned = true
         for v in Int32(1):solver.num_vars
             if solver.assignment[v] == 0
@@ -397,29 +369,25 @@ function solve!(solver::DPLL)::Bool
             return true
         end
         
-        # Pick branching variable
         branch_var = pick_branching_variable(solver)
         if branch_var == 0
-            return true  # All variables assigned
+            return true
         end
         
-        # Make decision
         solver.current_level += Int32(1)
-        assign!(solver, branch_var, true)  # Try positive first
+        assign!(solver, branch_var, true)
         
         conflict = propagate!(solver, branch_var)
         
         if conflict != 0
-            # Analyze conflict
             backtrack_level = analyze_conflict!(solver, conflict)
             
             if backtrack_level < 0
-                return false  # UNSAT
+                return false
             end
             
             backtrack!(solver, backtrack_level)
             
-            # Try negative
             solver.current_level += Int32(1)
             assign!(solver, branch_var, false)
             
@@ -434,14 +402,12 @@ function solve!(solver::DPLL)::Bool
             end
         end
         
-        # Adaptive restart every 100 conflicts
         if solver.conflicts % Int32(100) == 0 && solver.conflicts > 0
             backtrack!(solver, Int32(0))
         end
     end
 end
 
-# Get solution
 function get_solution(solver::DPLL)::Dict{Int, Bool}
     solution = Dict{Int, Bool}()
     for var in 1:solver.num_vars
@@ -454,7 +420,6 @@ function get_solution(solver::DPLL)::Dict{Int, Bool}
     return solution
 end
 
-# Main entry point
 function run_dpll(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
     try
         solver = DPLL(instance)
@@ -470,3 +435,5 @@ function run_dpll(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
         rethrow(e)
     end
 end
+
+end # module DPLLBad
