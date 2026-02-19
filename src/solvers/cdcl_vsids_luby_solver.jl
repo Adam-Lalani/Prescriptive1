@@ -76,11 +76,11 @@ function heap_remove_max!(h::VarHeap)::Int
     return v
 end
 
+# Call after increasing activity only; node can only move up in max-heap.
 function heap_update!(h::VarHeap, v::Int)
     pos = h.indices[v]
     if pos == -1; return; end
     heap_sift_up!(h, pos)
-    heap_sift_down!(h, h.indices[v])
 end
 
 heap_contains(h::VarHeap, v::Int)::Bool = h.indices[v] != -1
