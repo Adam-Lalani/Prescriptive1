@@ -132,7 +132,8 @@ function propagate!(s::Solver)::Int
                 clause[1], clause[2] = clause[2], clause[1]
             end
 
-            if clen >= 1 && lit_value(s, clause[1]) == Int8(1)
+            val1 = lit_value(s, clause[1])
+            if val1 == Int8(1)
                 push!(new_ws, Watcher(w.clause_idx, clause[1]))
                 i += 1; continue
             end
@@ -154,7 +155,7 @@ function propagate!(s::Solver)::Int
                 i += 1; continue
             end
 
-            if clen >= 1 && lit_value(s, clause[1]) == Int8(-1)
+            if val1 == Int8(-1)
                 push!(new_ws, w)
                 for j in (i+1):length(ws); push!(new_ws, ws[j]); end
                 s.watches[fidx] = new_ws
@@ -162,12 +163,10 @@ function propagate!(s::Solver)::Int
             end
 
             push!(new_ws, Watcher(w.clause_idx, clause[1]))
-            if clen >= 1
-                if !enqueue!(s, clause[1], w.clause_idx)
-                    for j in (i+1):length(ws); push!(new_ws, ws[j]); end
-                    s.watches[fidx] = new_ws
-                    return w.clause_idx
-                end
+            if !enqueue!(s, clause[1], w.clause_idx)
+                for j in (i+1):length(ws); push!(new_ws, ws[j]); end
+                s.watches[fidx] = new_ws
+                return w.clause_idx
             end
             i += 1
         end
@@ -187,6 +186,7 @@ function analyze(s::Solver, conflict::Int)::Tuple{Vector{Int}, Int}
     counter = 0
     p = 0
     reason = conflict
+    cl = current_level(s)
 
     fill!(s.seen, false)
 
@@ -198,7 +198,7 @@ function analyze(s::Solver, conflict::Int)::Tuple{Vector{Int}, Int}
             if s.seen[v]; continue; end
             s.seen[v] = true
 
-            if s.levels[v] == current_level(s)
+            if s.levels[v] == cl
                 counter += 1
             else
                 push!(learned, lit)
