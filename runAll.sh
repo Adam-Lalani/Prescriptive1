@@ -33,25 +33,19 @@ fi
 
 # Create the log file
 touch $logFile
-i=1
-# Run on every file, get the last line, append to log file
+# Run on every file, get the last line, append to log file (each run limited to timeLimit seconds)
 for f in $inputFolder*.*
 do
-	if ((i<8)); then
-		((i++))
-		continue
-	fi
 	fullFileName=$(realpath "$f")
 	echo "Running $fullFileName"
-	# timeout $timeLimit ./run.sh --solver "$solver" "$fullFileName" > output.tmp
-	./run.sh --solver "$solver" "$fullFileName" > output.tmp
+	timeout $timeLimit ./run.sh --solver "$solver" "$fullFileName" > output2.tmp
 	returnValue="$?"
 	if [[ "$returnValue" = 0 ]]; then 					# Run is successful
-		cat output.tmp | tail -1 >> $logFile			# Record the last line as solution
+		cat output2.tmp | tail -1 >> $logFile			# Record the last line as solution
 	else 										# Run failed, record the instanceName with no solution
 		echo Error
 		instance=$(basename "$fullFileName")	
 		echo "{\"Instance\": \"$instance\", \"Time\": \"--\", \"Result\": \"--\"}" >> $logFile	
 	fi
-	rm -f output.tmp
+	rm -f output2.tmp
 done
