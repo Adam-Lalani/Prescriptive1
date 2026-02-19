@@ -18,5 +18,6 @@ module load julia
 source venv/bin/activate
 
 export PATH="$HOME/.juliaup/bin:$PATH"
-
-./runAll.sh input 1 results.log
+#     "dpll", "dpll_bad"  "cdcl_basic" "cdcl_vsids" "cdcl_vsids_luby" 
+SOLVER="dpll"
+./runAll.sh input 1 "${SOLVER}-results.log" "$SOLVER"
