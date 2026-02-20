@@ -1,4 +1,4 @@
-module CDCLVSIDSLuby
+module CDCLVSIDSLubyNd
 
 import ..SATInstance
 
@@ -513,10 +513,11 @@ function cdcl_solve(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
                 enqueue!(solver, learned_clause[1], cidx)
             end
 
-            if solver.num_conflicts >= next_reduce
-                reduce_db!(solver)
-                next_reduce += reduce_interval
-            end
+            # Clause deletion disabled in this variant
+            # if solver.num_conflicts >= next_reduce
+            #     reduce_db!(solver)
+            #     next_reduce += reduce_interval
+            # end
 
             conflicts_until_restart -= 1
             if conflicts_until_restart <= 0
@@ -542,4 +543,4 @@ function cdcl_solve(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
     end
 end
 
-end # module CDCLVSIDSLuby
+end # module CDCLVSIDSLubyNd
