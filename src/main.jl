@@ -7,6 +7,8 @@ include("solvers/dpll_bad.jl")
 include("solvers/cdcl_basic_solver.jl")
 include("solvers/cdcl_vsids_solver.jl")
 include("solvers/cdcl_vsids_luby_solver.jl")
+include("solvers/cdcl_vsids_luby_sd.jl")
+include("solvers/cdcl_vsids_luby_nd.jl")
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
@@ -21,6 +23,8 @@ const SOLVERS = Dict(
     "cdcl_basic"      => inst -> CDCLBasic.cdcl_solve(inst),
     "cdcl_vsids"      => inst -> CDCLVSIDS.cdcl_solve(inst),
     "cdcl_vsids_luby" => inst -> CDCLVSIDSLuby.cdcl_solve(inst),
+    "cdcl_vsids_luby_sd" => inst -> CDCLVSIDSLubySd.cdcl_solve(inst),
+    "cdcl_vsids_luby_nd" => inst -> CDCLVSIDSLubyNd.cdcl_solve(inst),
 )
 
 const DEFAULT_SOLVER = "dpll"
@@ -64,25 +68,23 @@ function main(args::Vector{String})
     solve_fn = SOLVERS[solver_name]
     filename = basename(input_file)
     
-    timer = Timer()
-    start!(timer)
-    
     try
         instance = parse_cnf_file(input_file)
         if !isnothing(instance)
             print(instance)
         end
-        
+
+        timer = Timer()
+        start!(timer)
         sol = solve_fn(instance)
-        
         stop!(timer)
-        
+
         sol_str = "--"
         result = "UNSAT"
         if !isnothing(sol)
             result = "SAT"
             sol_str = ""
-            for var in sort(collect(instance.vars))
+            for var in 1:instance.numVars
                 sol_str *= string(var) * " "
                 sol_str *= sol[var] ? "true " : "false "
             end
