@@ -38,14 +38,14 @@ for f in $inputFolder*.*
 do
 	fullFileName=$(realpath "$f")
 	echo "Running $fullFileName"
-	timeout $timeLimit ./run.sh --solver "$solver" "$fullFileName" > output2.tmp
+	timeout $timeLimit ./run.sh --solver "$solver" "$fullFileName" > output4.tmp
 	returnValue="$?"
 	if [[ "$returnValue" = 0 ]]; then 					# Run is successful
-		cat output2.tmp | tail -1 >> $logFile			# Record the last line as solution
+		cat output4.tmp | tail -1 >> $logFile			# Record the last line as solution
 	else 										# Run failed, record the instanceName with no solution
 		echo Error
 		instance=$(basename "$fullFileName")	
 		echo "{\"Instance\": \"$instance\", \"Time\": \"--\", \"Result\": \"--\"}" >> $logFile	
 	fi
-	rm -f output2.tmp
+	rm -f output4.tmp
 done

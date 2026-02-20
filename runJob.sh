@@ -3,8 +3,8 @@
 #SBATCH -N 1
 #SBATCH -t 10:00:00
 #SBATCH --mem=64G
-#SBATCH -o cvl22_mindy.out
-#SBATCH -e cvl22_mindy.out
+#SBATCH -o final_cdcl_luby_smart_delete.out
+#SBATCH -e final_cdcl_luby_smart_delete.out
 
 module purge
 unset LD_LIBRARY_PATH
@@ -14,6 +14,6 @@ export PATH="$HOME/.juliaup/bin:$PATH"
 # Ensure project deps (e.g. JSON) are installed on this node
 julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
 
-#     "dpll", "dpll_bad"  "cdcl_basic" "cdcl_vsids" "cdcl_vsids_luby" 
-SOLVER="cdcl_vsids"
-./runAll.sh input 300 "${SOLVER}-results.log" "$SOLVER"
+#     "dpll", "dpll_bad"  "cdcl_basic" "cdcl_vsids" "cdcl_vsids_luby" "cdcl_vsids_luby_sd"
+SOLVER="cdcl_vsids_luby_sd"
+./runAll.sh input 300 "${SOLVER}-results-final_luby_smart_delete.log" "$SOLVER"
