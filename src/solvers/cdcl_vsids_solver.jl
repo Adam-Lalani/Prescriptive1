@@ -29,16 +29,18 @@ end
 @inline heap_right(i::Int)  = 2 * i + 1
 
 function heap_swap!(h::VarHeap, i::Int, j::Int)
-    h.indices[h.heap[i]] = j
-    h.indices[h.heap[j]] = i
-    h.heap[i], h.heap[j] = h.heap[j], h.heap[i]
+    @inbounds begin
+        h.indices[h.heap[i]] = j
+        h.indices[h.heap[j]] = i
+        h.heap[i], h.heap[j] = h.heap[j], h.heap[i]
+    end
 end
 
 function heap_sift_up!(h::VarHeap, pos::Int)
-    v = h.heap[pos]
+    @inbounds v = h.heap[pos]
     while pos > 1
         p = heap_parent(pos)
-        if h.activity[h.heap[p]] >= h.activity[v]; break; end
+        @inbounds if h.activity[h.heap[p]] >= h.activity[v]; break; end
         heap_swap!(h, pos, p)
         pos = p
     end
@@ -49,8 +51,10 @@ function heap_sift_down!(h::VarHeap, pos::Int)
     while true
         best = pos
         l = heap_left(pos); r = heap_right(pos)
-        if l <= sz && h.activity[h.heap[l]] > h.activity[h.heap[best]]; best = l; end
-        if r <= sz && h.activity[h.heap[r]] > h.activity[h.heap[best]]; best = r; end
+        @inbounds begin
+            if l <= sz && h.activity[h.heap[l]] > h.activity[h.heap[best]]; best = l; end
+            if r <= sz && h.activity[h.heap[r]] > h.activity[h.heap[best]]; best = r; end
+        end
         if best == pos; break; end
         heap_swap!(h, pos, best)
         pos = best
@@ -76,7 +80,6 @@ function heap_remove_max!(h::VarHeap)::Int
     return v
 end
 
-# Call after increasing activity only; node can only move up in max-heap.
 function heap_update!(h::VarHeap, v::Int)
     pos = h.indices[v]
     if pos == -1; return; end
@@ -118,6 +121,10 @@ mutable struct Solver
     var_decay::Float64
     order_heap::VarHeap
 
+    clause_activity::Vector{Float64}
+    clause_inc::Float64
+    deleted::Vector{Bool}
+
     num_original_clauses::Int
     num_conflicts::Int
     num_decisions::Int
@@ -138,11 +145,12 @@ function Solver(instance::SATInstance)
         fill(false, n), fill(false, n),
         Int[], Int[], 0,
         activity, 1.0, 0.95, order_heap,
+        Float64[], 1.0, Bool[],
         0, 0, 0, 0
     )
 
-    for clause_set in instance.clauses
-        add_clause!(solver, collect(clause_set))
+    for clause in instance.clauses
+        add_clause!(solver, copy(clause))
     end
     solver.num_original_clauses = length(solver.clauses)
 
@@ -158,7 +166,7 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 @inline function lit_value(s::Solver, lit::Int)::Int8
-    val = s.values[lit_var(lit)]
+    @inbounds val = s.values[lit_var(lit)]
     val == 0 ? Int8(0) : (lit > 0 ? val : -val)
 end
 
@@ -166,6 +174,8 @@ end
 
 function add_clause!(s::Solver, lits::Vector{Int})::Int
     push!(s.clauses, lits)
+    push!(s.clause_activity, 0.0)
+    push!(s.deleted, false)
     cidx = length(s.clauses)
     if length(lits) >= 2
         push!(s.watches[lit_index(lits[1])], Watcher(cidx, lits[2]))
@@ -176,12 +186,14 @@ end
 
 function enqueue!(s::Solver, lit::Int, reason::Int)::Bool
     v = lit_var(lit)
-    if s.values[v] != 0
-        return s.values[v] == (lit > 0 ? Int8(1) : Int8(-1))
+    @inbounds begin
+        if s.values[v] != 0
+            return s.values[v] == (lit > 0 ? Int8(1) : Int8(-1))
+        end
+        s.values[v]  = lit > 0 ? Int8(1) : Int8(-1)
+        s.levels[v]  = current_level(s)
+        s.reasons[v] = reason
     end
-    s.values[v]  = lit > 0 ? Int8(1) : Int8(-1)
-    s.levels[v]  = current_level(s)
-    s.reasons[v] = reason
     push!(s.trail, lit)
     return true
 end
@@ -191,44 +203,47 @@ function new_decision_level!(s::Solver)
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2-Watched-Literal BCP
+# 2-Watched-Literal BCP (skips deleted clauses lazily)
 # ──────────────────────────────────────────────────────────────────────────────
 
 function propagate!(s::Solver)::Int
     while s.qhead < length(s.trail)
         s.qhead += 1
-        p = s.trail[s.qhead]
+        @inbounds p = s.trail[s.qhead]
         s.num_propagations += 1
 
         false_lit = lit_neg(p)
         fidx = lit_index(false_lit)
-        ws = s.watches[fidx]
-        new_ws = Watcher[]
+        @inbounds ws = s.watches[fidx]
+        n_ws = length(ws)
+        i = 1; j = 1
 
-        i = 1
-        while i <= length(ws)
-            w = ws[i]
+        while i <= n_ws
+            @inbounds w = ws[i]
 
-            if lit_value(s, w.blocker) == Int8(1)
-                push!(new_ws, w)
+            @inbounds if s.deleted[w.clause_idx]
                 i += 1; continue
             end
 
-            clause = s.clauses[w.clause_idx]
+            if lit_value(s, w.blocker) == Int8(1)
+                @inbounds ws[j] = w; j += 1; i += 1; continue
+            end
+
+            @inbounds clause = s.clauses[w.clause_idx]
             clen = length(clause)
 
-            if clen >= 2 && clause[1] == false_lit
+            @inbounds if clen >= 2 && clause[1] == false_lit
                 clause[1], clause[2] = clause[2], clause[1]
             end
 
-            val1 = lit_value(s, clause[1])
+            @inbounds val1 = lit_value(s, clause[1])
             if val1 == Int8(1)
-                push!(new_ws, Watcher(w.clause_idx, clause[1]))
-                i += 1; continue
+                @inbounds ws[j] = Watcher(w.clause_idx, clause[1])
+                j += 1; i += 1; continue
             end
 
             found_new = false
-            if clen >= 3
+            @inbounds if clen >= 3
                 for k in 3:clen
                     if lit_value(s, clause[k]) != Int8(-1)
                         clause[2], clause[k] = clause[k], clause[2]
@@ -245,22 +260,23 @@ function propagate!(s::Solver)::Int
             end
 
             if val1 == Int8(-1)
-                push!(new_ws, w)
-                for j in (i+1):length(ws); push!(new_ws, ws[j]); end
-                s.watches[fidx] = new_ws
+                @inbounds ws[j] = w; j += 1; i += 1
+                @inbounds while i <= n_ws; ws[j] = ws[i]; j += 1; i += 1; end
+                resize!(ws, j - 1)
                 return w.clause_idx
             end
 
-            push!(new_ws, Watcher(w.clause_idx, clause[1]))
-            if !enqueue!(s, clause[1], w.clause_idx)
-                for j in (i+1):length(ws); push!(new_ws, ws[j]); end
-                s.watches[fidx] = new_ws
+            @inbounds ws[j] = Watcher(w.clause_idx, clause[1]); j += 1
+            @inbounds if !enqueue!(s, clause[1], w.clause_idx)
+                i += 1
+                while i <= n_ws; ws[j] = ws[i]; j += 1; i += 1; end
+                resize!(ws, j - 1)
                 return w.clause_idx
             end
             i += 1
         end
 
-        s.watches[fidx] = new_ws
+        resize!(ws, j - 1)
     end
     return 0
 end
@@ -270,9 +286,9 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 function var_bump_activity!(s::Solver, v::Int)
-    s.activity[v] += s.var_inc
-    if s.activity[v] > 1e100
-        for i in 1:s.num_vars; s.activity[i] *= 1e-100; end
+    @inbounds s.activity[v] += s.var_inc
+    @inbounds if s.activity[v] > 1e100
+        for i in 1:s.num_vars; @inbounds s.activity[i] *= 1e-100; end
         s.var_inc *= 1e-100
     end
     if heap_contains(s.order_heap, v)
@@ -282,6 +298,53 @@ end
 
 function var_decay_activity!(s::Solver)
     s.var_inc *= (1.0 / s.var_decay)
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Clause activity
+# ──────────────────────────────────────────────────────────────────────────────
+
+function clause_bump_activity!(s::Solver, cidx::Int)
+    if cidx <= 0; return; end
+    @inbounds s.clause_activity[cidx] += s.clause_inc
+    @inbounds if s.clause_activity[cidx] > 1e20
+        for i in 1:length(s.clause_activity)
+            @inbounds s.clause_activity[i] *= 1e-20
+        end
+        s.clause_inc *= 1e-20
+    end
+end
+
+function clause_decay_activity!(s::Solver)
+    s.clause_inc *= (1.0 / 0.999)
+end
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Learned clause deletion
+# ──────────────────────────────────────────────────────────────────────────────
+
+function reduce_db!(s::Solver)
+    candidates = Int[]
+    for ci in (s.num_original_clauses + 1):length(s.clauses)
+        @inbounds if s.deleted[ci]; continue; end
+        clause = s.clauses[ci]
+        if length(clause) <= 2; continue; end
+        locked = false
+        if length(clause) >= 1
+            @inbounds v = lit_var(clause[1])
+            @inbounds if s.values[v] != 0 && s.reasons[v] == ci
+                locked = true
+            end
+        end
+        if !locked
+            push!(candidates, ci)
+        end
+    end
+    sort!(candidates, by=ci -> @inbounds(s.clause_activity[ci]))
+    n_delete = div(length(candidates), 2)
+    for k in 1:n_delete
+        @inbounds s.deleted[candidates[k]] = true
+    end
 end
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -299,49 +362,53 @@ function analyze(s::Solver, conflict::Int)::Tuple{Vector{Int}, Int}
     fill!(s.seen, false)
 
     while true
-        clause = s.clauses[reason]
+        clause_bump_activity!(s, reason)
+        @inbounds clause = s.clauses[reason]
         for lit in clause
             v = lit_var(lit)
             if v == lit_var(p) && p != 0; continue; end
-            if s.seen[v]; continue; end
-            s.seen[v] = true
+            @inbounds if s.seen[v]; continue; end
+            @inbounds s.seen[v] = true
             var_bump_activity!(s, v)
 
-            if s.levels[v] == cl
+            @inbounds if s.levels[v] == cl
                 counter += 1
             else
                 push!(learned, lit)
             end
         end
 
-        while true
+        @inbounds while true
             p = s.trail[trail_idx]
             trail_idx -= 1
             if s.seen[lit_var(p)]; break; end
         end
         counter -= 1
         if counter == 0; break; end
-        reason = s.reasons[lit_var(p)]
+        @inbounds reason = s.reasons[lit_var(p)]
     end
 
     pushfirst!(learned, lit_neg(p))
 
     bt_level = 0
     if length(learned) > 1
-        max_idx = 2
-        max_lvl = s.levels[lit_var(learned[2])]
-        for i in 3:length(learned)
-            lvl = s.levels[lit_var(learned[i])]
-            if lvl > max_lvl
-                max_lvl = lvl
-                max_idx = i
+        @inbounds begin
+            max_idx = 2
+            max_lvl = s.levels[lit_var(learned[2])]
+            for i in 3:length(learned)
+                lvl = s.levels[lit_var(learned[i])]
+                if lvl > max_lvl
+                    max_lvl = lvl
+                    max_idx = i
+                end
             end
+            learned[2], learned[max_idx] = learned[max_idx], learned[2]
         end
-        learned[2], learned[max_idx] = learned[max_idx], learned[2]
         bt_level = max_lvl
     end
 
     var_decay_activity!(s)
+    clause_decay_activity!(s)
 
     return (learned, bt_level)
 end
@@ -352,13 +419,15 @@ end
 
 function backtrack!(s::Solver, level::Int)
     if current_level(s) <= level; return; end
-    target = s.trail_lim[level + 1]
+    @inbounds target = s.trail_lim[level + 1]
     while length(s.trail) > target
         lit = pop!(s.trail)
         v = lit_var(lit)
-        s.polarity[v] = lit > 0
-        s.values[v]   = Int8(0)
-        s.reasons[v]  = 0
+        @inbounds begin
+            s.polarity[v] = lit > 0
+            s.values[v]   = Int8(0)
+            s.reasons[v]  = 0
+        end
         if !heap_contains(s.order_heap, v)
             heap_insert!(s.order_heap, v)
         end
@@ -406,6 +475,9 @@ function cdcl_solve(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
 
     if propagate!(solver) != 0; return nothing; end
 
+    reduce_interval = 2000
+    next_reduce = reduce_interval
+
     while true
         conflict = propagate!(solver)
 
@@ -421,6 +493,11 @@ function cdcl_solve(instance::SATInstance)::Union{Dict{Int, Bool}, Nothing}
             else
                 cidx = add_clause!(solver, learned_clause)
                 enqueue!(solver, learned_clause[1], cidx)
+            end
+
+            if solver.num_conflicts >= next_reduce
+                reduce_db!(solver)
+                next_reduce += reduce_interval
             end
         else
             var = pick_branching_var(solver)

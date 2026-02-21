@@ -33,12 +33,11 @@ mutable struct DPLL
         clauses = WatchedClause[]
         watch_list = Dict{Int, Vector{Int}}()
         
-        for clause_set in instance.clauses
-            clause_vec = collect(clause_set)
+        for clause_vec in instance.clauses
             if isempty(clause_vec)
                 error("Empty clause found - UNSAT")
             end
-            push!(clauses, WatchedClause(clause_vec))
+            push!(clauses, WatchedClause(copy(clause_vec)))
         end
         
         # Initialize watch lists

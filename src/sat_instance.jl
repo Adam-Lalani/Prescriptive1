@@ -1,29 +1,19 @@
 mutable struct SATInstance
     numVars::Int
     numClauses::Int
-    vars::Set{Int}
-    clauses::Vector{Set{Int}}
+    clauses::Vector{Vector{Int}}
     
     function SATInstance(numVars::Int, numClauses::Int, 
-                         vars::Set{Int}=Set{Int}(), 
-                         clauses::Vector{Set{Int}}=Vector{Set{Int}}())
-        new(numVars, numClauses, vars, clauses)
+                         clauses::Vector{Vector{Int}}=Vector{Int}[])
+        new(numVars, numClauses, clauses)
     end
 end
 
-function add_variable!(instance::SATInstance, literal::Int)
-    push!(instance.vars, abs(literal))
-end
-
-function add_clause!(instance::SATInstance, clause::Set{Int})
+function add_clause!(instance::SATInstance, clause::Vector{Int})
     push!(instance.clauses, clause)
 end
 
 function Base.show(io::IO, instance::SATInstance)
     println(io, "Number of variables: $(instance.numVars)")
     println(io, "Number of clauses: $(instance.numClauses)")
-    println(io, "Variables: $(instance.vars)")
-    for (i, clause) in enumerate(instance.clauses)
-        println(io, "Clause $(i-1): $clause")
-    end
 end

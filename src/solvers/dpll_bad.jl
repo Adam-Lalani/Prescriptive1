@@ -48,12 +48,11 @@ mutable struct DPLL
         
         watch_list = [Int32[] for _ in 1:(2*num_vars + 2)]
         
-        for clause_set in instance.clauses
-            clause_vec = collect(clause_set)
+        for clause_vec in instance.clauses
             if isempty(clause_vec)
                 error("Empty clause found - UNSAT")
             end
-            push!(clauses, WatchedClauseOptimized(clause_vec))
+            push!(clauses, WatchedClauseOptimized(copy(clause_vec)))
         end
         
         # Initialize watch lists
