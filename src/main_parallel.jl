@@ -86,8 +86,7 @@ function race_solvers(instance::SATInstance, solver_names::Vector{String})
                         start!(timer)
                         
                         solve_fn = SOLVERS[solver_name]
-                        sol = solve_fn(deepcopy(instance))
-                        # sol = solve_fn(instance)
+                        sol = solve_fn(instance)
                         
                         stop!(timer)
                         elapsed = get_time(timer)
