@@ -81,25 +81,37 @@ function race_solvers(instance::SATInstance, solver_names::Vector{String})
         for solver_name in solver_names
             Threads.@spawn begin
                 try
-                    if !finished[]
-                        timer = Timer()
-                        start!(timer)
-                        
-                        solve_fn = SOLVERS[solver_name]
-                        sol = solve_fn(instance)
-                        
-                        stop!(timer)
-                        elapsed = get_time(timer)
-                        
-                        # Try to put result - only first one matters
-                        if !finished[]
-                            Threads.atomic_xchg!(finished, true)
+                    # All solvers run to completion, first to finish submits result
+                    timer = Timer()
+                    start!(timer)
+                    
+                    solve_fn = SOLVERS[solver_name]
+                    sol = solve_fn(deepcopy(instance))
+                    
+                    stop!(timer)
+                    elapsed = get_time(timer)
+                    
+                    # Use atomic compare-and-swap to ensure only first solver submits
+                    if sol !== nothing
+                        # Try to set finished from false to true
+                        old_val = Threads.atomic_cas!(finished, false, true)
+                        if old_val == false
+                            # We successfully transitioned from false to true
+                            # This means we're the first to finish with a solution
                             put!(result_channel, (sol, elapsed, solver_name))
+                        end
+                    elseif !finished[]
+                        # This solver found UNSAT - only submit if no one found SAT yet
+                        old_val = Threads.atomic_cas!(finished, false, true)
+                        if old_val == false
+                            put!(result_channel, (nothing, elapsed, solver_name))
                         end
                     end
                 catch e
-                    # If a solver crashes, just skip it
+                    # If a solver crashes, log it but continue
                     @warn "Solver $solver_name crashed: $e"
+                    println(stderr, "Stack trace:")
+                    println(stderr, sprint(showerror, e, catch_backtrace()))
                 end
             end
         end
