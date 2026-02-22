@@ -55,7 +55,7 @@ function Solver(instance::SATInstance)
         Vector{Int}[],
         watches,
         zeros(Int8, n), zeros(Int, n), zeros(Int, n),
-        rand(Bool, n), fill(false, n),
+        fill(true, n), fill(false, n),
         Int[], Int[], 0,
         0, 0, 0
     )
