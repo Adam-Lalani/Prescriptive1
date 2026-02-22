@@ -10,11 +10,7 @@ then
 	exit $E_BADARGS
 fi
 
-# run the solver — forward all arguments to main.jl
+# run the solver
+# forward all arguments to main.jl
 set -e
-<<<<<<< Updated upstream
-# export JULIA_NUM_THREADS=2
-=======
-export JULIA_NUM_THREADS=2
->>>>>>> Stashed changes
 julia --project=. src/main_processes.jl "$@"
