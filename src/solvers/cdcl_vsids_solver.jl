@@ -2,6 +2,8 @@ module CDCLVSIDS
 
 import ..SATInstance
 
+using Random
+
 # ──────────────────────────────────────────────────────────────────────────────
 # OPTIMIZATIONS APPLIED:
 # 1. Pre-allocated arrays to avoid allocations in hot paths
@@ -155,13 +157,14 @@ function Solver(instance::SATInstance)
     watches  = [Watcher[] for _ in 1:(2*n)]
     activity = zeros(Float64, n)
     order_heap = VarHeap(n, activity)
+    Random.seed!(12345)
 
     solver = Solver(
         n,
         Vector{Int}[],
         watches,
         zeros(Int8, n), zeros(Int, n), zeros(Int, n),
-        fill(true, n), fill(false, n),
+        rand(Bool), fill(false, n),
         Int[], Int[], 0,
         activity, 1.0, 0.95, order_heap,
         Float64[], 1.0, Bool[],
