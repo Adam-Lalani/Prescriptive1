@@ -14,6 +14,8 @@ using Pkg
 Pkg.activate(joinpath(@__DIR__, ".."))
 Pkg.instantiate()
 
+Pkg.add("JSON")
+
 using JSON
 using .DimacsParser
 

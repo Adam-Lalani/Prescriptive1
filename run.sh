@@ -12,4 +12,5 @@ fi
 
 # run the solver — forward all arguments to main.jl
 set -e
-julia --project=. src/main.jl "$@"
+export JULIA_NUM_THREADS=3
+julia --project=. src/main_parallel.jl "$@"
