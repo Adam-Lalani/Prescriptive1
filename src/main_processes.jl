@@ -294,11 +294,7 @@ function main(args::Vector{String})
             "Solver" => winning_solver
         )
         
-        println()
-        println("="^60)
-        println("RESULT:")
-        println(JSON.json(printSol, 2))
-        println("="^60)
+        println(JSON.json(printSol))
         
     catch e
         println("Error: $e")
