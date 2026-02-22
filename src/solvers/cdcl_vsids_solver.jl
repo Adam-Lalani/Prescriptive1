@@ -164,7 +164,7 @@ function Solver(instance::SATInstance)
         Vector{Int}[],
         watches,
         zeros(Int8, n), zeros(Int, n), zeros(Int, n),
-        rand(Bool), fill(false, n),
+        fill(rand(Bool), n), fill(false, n),
         Int[], Int[], 0,
         activity, 1.0, 0.95, order_heap,
         Float64[], 1.0, Bool[],
