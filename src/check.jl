@@ -1,6 +1,9 @@
 include("sat_instance.jl")
 include("dimacs_parser.jl")
 
+import Pkg
+Pkg.add("JSON")
+
 using JSON
 using .DimacsParser
 
@@ -51,7 +54,7 @@ function parse_log_file(path::String)
                 continue
             end
 
-            input_file = "input/" * record["Instance"]
+            input_file = "../input/" * record["Instance"]
             solution_str = record["Solution"]
 
             assignment = parse_solution(solution_str)
@@ -59,6 +62,7 @@ function parse_log_file(path::String)
 
             filename = basename(input_file)
             instance = parse_cnf_file(input_file)
+            good_instance = true
 
             for clause in instance.clauses
                 valid_clause = false
@@ -75,11 +79,16 @@ function parse_log_file(path::String)
                     end
                 end
                 if !valid_clause
-                    println(input_file * " has false solution!")
+                    good_instance = false
                     break
                 end
             end
-        end
+            if good_instance
+                println("correct solution")
+            else
+                println(input_file * " has false solution!")
+            end 
+       end
     end
 
     return results
@@ -90,7 +99,7 @@ end
 # Example usage
 # -----------------------------
 if abspath(PROGRAM_FILE) == @__FILE__
-    log_path = "results1.log"
+    log_path = "../results.log"
     results = parse_log_file(log_path)
 
     println("Parsed $(length(results)) SAT instances")
