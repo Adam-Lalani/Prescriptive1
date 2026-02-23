@@ -249,7 +249,7 @@ function main(args::Vector{String})
         end
 
         # Run solver(s)
-        race_solvers_multiprocess(input_file, solver_names, timeout)
+        sol, elapsed, winning_solver = race_solvers_multiprocess(input_file, solver_names, timeout)
 
         # Format output
         sol_str = "--"
