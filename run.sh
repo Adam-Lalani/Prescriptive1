@@ -13,4 +13,4 @@ fi
 # run the solver
 # forward all arguments to main.jl
 set -e
-julia --project=. src/main_processes.jl "$@"
+julia --project=. src/main.jl "$@"
