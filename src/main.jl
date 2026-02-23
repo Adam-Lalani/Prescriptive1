@@ -15,8 +15,6 @@ const SOLVERS = [
     "cdcl_vsids_luby_nd"
 ]
 
-const DEFAULT_SOLVER = "dpll"
-
 function parse_args(args::Vector{String})
     solver_names = String[]
     input_file = nothing
@@ -43,7 +41,9 @@ function parse_args(args::Vector{String})
     end
 
     if isempty(solver_names)
-        push!(solver_names, DEFAULT_SOLVER)
+        push!(solver_names, "cdcl_vsids")
+        push!(solver_names, "cdcl_vsids_luby")
+        push!(solver_names, "cdcl_vsids_luby_sd")
     end
 
     return solver_names, input_file, timeout
