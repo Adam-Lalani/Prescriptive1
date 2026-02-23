@@ -39,7 +39,6 @@ function main(args::Vector{String})
     input_file = args[2]
     output_file = args[3]
     
-    # Validate solver
     if !haskey(SOLVERS, solver_name)
         println(stderr, "Unknown solver: $solver_name")
         println(stderr, "Available: $(join(sort(collect(keys(SOLVERS))), ", "))")
