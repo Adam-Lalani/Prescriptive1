@@ -139,7 +139,7 @@ function Solver(instance::SATInstance)
     watches  = [Watcher[] for _ in 1:(2*n)]
     activity = zeros(Float64, n)
     order_heap = VarHeap(n, activity)
-    Random.seed!(12345)
+    # Random.seed!(12345)
 
     solver = Solver(
         n,
