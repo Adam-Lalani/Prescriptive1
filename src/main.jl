@@ -2,6 +2,13 @@ include("sat_instance.jl")
 include("dimacs_parser.jl")
 include("model_timer.jl")
 
+using Pkg
+Pkg.add([
+    Pkg.PackageSpec(name="JSON", version="0.21.4"),
+    Pkg.PackageSpec(name="ArgParse", version="1.1.4")
+])
+Pkg.instantiate()
+
 using JSON
 using .DimacsParser
 
